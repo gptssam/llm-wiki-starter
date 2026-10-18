@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LLM Wiki Knowledge Graph Viewer — Karpathy 3-Layer Second Brain</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --panel: #161b22;
+      --panel-alt: #1c2128;
+      --border: #30363d;
+      --fg: #e6edf3;
+      --dim: #8b949e;
+      --cyan: #38bdf8;
+      --amber: #f59e0b;
+      --green: #3fb950;
+      --purple: #a78bfa;
+      --coral: #ff5a50;
+      --blue-bg: rgba(56, 189, 248, 0.12);
+      --amber-bg: rgba(245, 158, 11, 0.12);
+      --green-bg: rgba(63, 185, 80, 0.14);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: var(--bg);
+      color: var(--fg);
+      font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    header {
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 20px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      flex-shrink: 0;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .brand-badge {
+      background: linear-gradient(135deg, #2563eb, #0ea5e9);
+      color: #fff;
+      font-weight: 800;
+      font-size: 13px;
+      padding: 5px 10px;
+      border-radius: 6px;
+      letter-spacing: 0.4px;
+    }
+    .brand h1 {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--fg);
+    }
+    .brand span.sub {
+      font-size: 12px;
+      color: var(--dim);
+      margin-left: 6px;
+    }
+    .metrics-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .metric-pill {
+      background: var(--panel-alt);
+      border: 1px solid var(--border);
+      padding: 5px 11px;
+      border-radius: 999px;
+      font-size: 12px;
+      color: var(--dim);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .metric-pill strong {
+      color: var(--fg);
+      font-weight: 700;
+    }
+    .metric-pill.pass {
+      background: var(--green-bg);
+      border-color: rgba(63, 185, 80, 0.4);
+      color: var(--green);
+      font-weight: 700;
+    }
+    .metric-pill.agent {
+      background: rgba(167, 139, 250, 0.12);
+      border-color: rgba(167, 139, 250, 0.35);
+      color: var(--purple);
+    }
+    main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 46% 54%;
+      min-height: 0;
+    }
+    /* Left Graph Column */
+    .graph-pane {
+      position: relative;
+      border-right: 1px solid var(--border);
+      background: radial-gradient(circle at 50% 45%, #131a24 0%, #0d1117 75%);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    .graph-toolbar {
+      padding: 10px 14px;
+      background: rgba(22, 27, 34, 0.85);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      z-index: 2;
+    }
+    .legend {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 11.5px;
+      color: var(--dim);
+      flex-wrap: nowrap;
+    }
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      white-space: nowrap;
+    }
+    .dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+    .dot.raw { background: var(--amber); }
+    .dot.wiki { background: var(--cyan); }
+    .dot.meta { background: var(--purple); }
+    .filter-input {
+      background: var(--bg);
+      border: 1px solid var(--border);
+      color: var(--fg);
+      padding: 4px 9px;
+      border-radius: 6px;
+      font-size: 11.5px;
+      width: 135px;
+      flex-shrink: 0;
+    }
+    #graphCanvas {
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+    }
+    #graphCanvas:active { cursor: grabbing; }
+    .graph-footer {
+      position: absolute;
+      bottom: 12px;
+      left: 14px;
+      right: 14px;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      pointer-events: none;
+      font-size: 11px;
+      color: var(--dim);
+    }
+    .graph-footer span {
+      background: rgba(13, 17, 23, 0.85);
+      border: 1px solid var(--border);
+      padding: 4px 9px;
+      border-radius: 6px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Right Inspector Column */
+    .inspector-pane {
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+      min-height: 0;
+    }
+    .tabs {
+      display: flex;
+      background: var(--panel);
+      border-bottom: 1px solid var(--border);
+      padding: 0 12px;
+      gap: 2px;
+      flex-shrink: 0;
+      overflow-x: auto;
+    }
+    .tab-btn {
+      background: transparent;
+      border: none;
+      color: var(--dim);
+      padding: 10px 11px;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      transition: all 0.15s;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .tab-btn:hover { color: var(--fg); }
+    .tab-btn.active {
+      color: var(--cyan);
+      border-bottom-color: var(--cyan);
+    }
+    .tab-content {
+      flex: 1;
+      overflow-y: auto;
+      padding: 18px 22px;
+      display: none;
+    }
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Reader UI */
+    .doc-header {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px 18px;
+      margin-bottom: 16px;
+    }
+    .doc-badge-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 8px;
+      flex-wrap: wrap;
+    }
+    .badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 5px;
+      text-transform: uppercase;
+    }
+    .badge.wiki { background: var(--blue-bg); color: var(--cyan); border: 1px solid rgba(56, 189, 248, 0.35); }
+    .badge.raw { background: var(--amber-bg); color: var(--amber); border: 1px solid rgba(245, 158, 11, 0.35); }
+    .badge.meta { background: rgba(167, 139, 250, 0.14); color: var(--purple); border: 1px solid rgba(167, 139, 250, 0.35); }
+    .doc-title {
+      font-size: 20px;
+      font-weight: 800;
+      margin-bottom: 6px;
+      color: var(--fg);
+    }
+    .doc-summary {
+      font-size: 13px;
+      color: #c9d1d9;
+      line-height: 1.55;
+      background: rgba(255,255,255,0.03);
+      padding: 8px 12px;
+      border-left: 3px solid var(--cyan);
+      border-radius: 4px;
+    }
+    .link-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+    .link-box {
+      background: var(--panel-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 12px;
+    }
+    .link-box h4 {
+      font-size: 11px;
+      color: var(--dim);
+      margin-bottom: 6px;
+      text-transform: uppercase;
+    }
+    .pill-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+    .node-pill {
+      font-size: 12px;
+      padding: 3px 9px;
+      border-radius: 6px;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--bg);
+      color: var(--cyan);
+      transition: all 0.15s;
+    }
+    .node-pill.raw-pill { color: var(--amber); }
+    .node-pill:hover {
+      background: var(--blue-bg);
+      border-color: var(--cyan);
+    }
+    .markdown-body {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px 20px;
+      font-size: 13.5px;
+      line-height: 1.7;
+      color: var(--fg);
+    }
+    .markdown-body h1, .markdown-body h2, .markdown-body h3 {
+      margin-top: 16px;
+      margin-bottom: 8px;
+      color: #fff;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 5px;
+    }
+    .markdown-body h1 { font-size: 18px; margin-top: 0; }
+    .markdown-body h2 { font-size: 15px; color: var(--cyan); }
+    .markdown-body p, .markdown-body li { margin-bottom: 6px; }
+    .markdown-body ul, .markdown-body ol { padding-left: 20px; margin-bottom: 10px; }
+    .markdown-body code {
+      background: rgba(255,255,255,0.08);
+      padding: 2px 5px;
+      border-radius: 4px;
+      font-family: "SFMono-Regular", Consolas, monospace;
+      font-size: 12px;
+      color: #79c0ff;
+    }
+    .markdown-body table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+      font-size: 12.5px;
+    }
+    .markdown-body th, .markdown-body td {
+      border: 1px solid var(--border);
+      padding: 7px 9px;
+      text-align: left;
+    }
+    .markdown-body th {
+      background: var(--panel-alt);
+      color: var(--cyan);
+    }
+    .wikilink-inline {
+      color: var(--cyan);
+      background: var(--blue-bg);
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-weight: 600;
+      cursor: pointer;
+      text-decoration: none;
+    }
+    .wikilink-inline:hover { text-decoration: underline; }
+
+    /* Before vs After Split Comparison */
+    .compare-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      height: 100%;
+    }
+    .compare-col {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .compare-col-header {
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 7px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .compare-col-header.before {
+      background: rgba(245, 158, 11, 0.1);
+      color: var(--amber);
+    }
+    .compare-col-header.after {
+      background: rgba(56, 189, 248, 0.1);
+      color: var(--cyan);
+    }
+    .compare-select {
+      background: var(--bg);
+      color: var(--fg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 6px 8px;
+      font-size: 12px;
+      width: 100%;
+      max-width: 100%;
+    }
+    .compare-body {
+      padding: 14px;
+      overflow-y: auto;
+      font-size: 12.5px;
+      line-height: 1.65;
+      white-space: pre-wrap;
+      font-family: "SFMono-Regular", Menlo, Monaco, monospace;
+      color: #d0d7de;
+      flex: 1;
+    }
+
+    /* Lint & Constitution Tab */
+    .lint-card {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 14px;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .lint-card .left h4 { font-size: 13.5px; margin-bottom: 3px; }
+    .lint-card .left p { font-size: 12px; color: var(--dim); }
+    .lint-pass {
+      background: var(--green-bg);
+      color: var(--green);
+      border: 1px solid rgba(63, 185, 80, 0.4);
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <span class="brand-badge">KARPATHY LLM WIKI</span>
+      <div>
+        <h1>제2의 뇌 지식 그래프 & 위키 뷰어 <span class="sub">raw/ → wiki/ → AGENTS.md (3-Layer Architecture)</span></h1>
+      </div>
+    </div>
+    <div class="metrics-bar" id="metricsBar"></div>
+  </header>
+
+  <main>
+    <!-- Left: Interactive Knowledge Graph -->
+    <section class="graph-pane">
+      <div class="graph-toolbar">
+        <div class="legend">
+          <div class="legend-item"><span class="dot raw"></span><span><code>raw/</code> 원자료 (5)</span></div>
+          <div class="legend-item"><span class="dot wiki"></span><span><code>wiki/</code> 문서 (7)</span></div>
+          <div class="legend-item"><span class="dot meta"></span><span><code>index/log</code> (2)</span></div>
+        </div>
+        <input type="text" id="searchInput" class="filter-input" placeholder="노드·키워드 검색..." />
+      </div>
+      <canvas id="graphCanvas"></canvas>
+      <div class="graph-footer">
+        <span>노드를 클릭하면 우측에 상세 문서와 <code>[[위키링크]]</code> 연결망이 표시됩니다.</span>
+        <span id="hoverStatus">선택: llm-wiki-architecture</span>
+      </div>
+    </section>
+
+    <!-- Right: Document & Before/After Inspector -->
+    <section class="inspector-pane">
+      <div class="tabs">
+        <button class="tab-btn active" data-tab="tab-reader">위키 문서 &amp; [[위키링크]]</button>
+        <button class="tab-btn" data-tab="tab-compare">Before(raw) ↔ After(wiki) 비교</button>
+        <button class="tab-btn" data-tab="tab-lint">/lint 감사 &amp; 에이전트 헌법</button>
+      </div>
+
+      <div id="tab-reader" class="tab-content active"></div>
+
+      <div id="tab-compare" class="tab-content">
+        <div class="compare-grid">
+          <div class="compare-col">
+            <div class="compare-col-header before">
+              <span>📂 BEFORE: <code>raw/</code> 비정형 날것 메모</span>
+              <select id="rawSelect" class="compare-select"></select>
+            </div>
+            <div id="rawCompareBody" class="compare-body"></div>
+          </div>
+          <div class="compare-col">
+            <div class="compare-col-header after">
+              <span>🧠 AFTER: <code>wiki/</code> 에이전트 컴파일 위키</span>
+              <select id="wikiSelect" class="compare-select"></select>
+            </div>
+            <div id="wikiCompareBody" class="compare-body"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="tab-lint" class="tab-content"></div>
+    </section>
+  </main>
+
+  <script src="./graph_data.js"></script>
+  <script>
+    (function () {
+      const data = window.WIKI_GRAPH_DATA;
+      if (!data) {
+        document.getElementById("tab-reader").innerHTML =
+          "<p>데이터를 불러올 수 없습니다. <code>python3 scripts/wiki_tool.py build</code>를 먼저 실행하세요.</p>";
+        return;
+      }
+
+      // 1. Render Top Metrics Bar
+      const st = data.stats;
+      const metricsBar = document.getElementById("metricsBar");
+      metricsBar.innerHTML = `
+        <div class="metric-pill">원자료(raw) <strong>${st.raw_count}건 (${st.raw_chars.toLocaleString()}자)</strong></div>
+        <div class="metric-pill">위키 문서(wiki) <strong>${st.wiki_total_files}건 (${st.wiki_chars.toLocaleString()}자)</strong></div>
+        <div class="metric-pill">교차 [[위키링크]] <strong>${st.wikilink_count}개</strong></div>
+        <div class="metric-pill">원자료 인용 <strong>${st.source_link_count}회</strong></div>
+        <div class="metric-pill pass">LINT 6/6 PASS ✔ (Dead Link 0)</div>
+        <div class="metric-pill agent">Antigravity (Gemini) · Claude Code 호환</div>
+      `;
+
+      // Map nodes by ID
+      const nodeMap = {};
+      data.nodes.forEach((n) => { nodeMap[n.id] = n; });
+
+      // 2. Setup Tabs
+      document.querySelectorAll(".tab-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          document.querySelectorAll(".tab-btn").forEach((b) => b.classList.remove("active"));
+          document.querySelectorAll(".tab-content").forEach((c) => c.classList.remove("active"));
+          btn.classList.add("active");
+          document.getElementById(btn.dataset.tab).classList.add("active");
+        });
+      });
+
+      // 3. Setup Before vs After Compare selectors
+      const rawSelect = document.getElementById("rawSelect");
+      const wikiSelect = document.getElementById("wikiSelect");
+      const rawNodes = data.nodes.filter((n) => n.group === "raw");
+      const wikiNodes = data.nodes.filter((n) => n.group === "wiki" || n.group === "meta");
+
+      rawNodes.forEach((n) => {
+        const opt = document.createElement("option");
+        opt.value = n.id;
+        opt.textContent = n.label;
+        rawSelect.appendChild(opt);
+      });
+      wikiNodes.forEach((n) => {
+        const opt = document.createElement("option");
+        opt.value = n.id;
+        opt.textContent = `${n.id}.md — ${n.title}`;
+        wikiSelect.appendChild(opt);
+      });
+
+      function updateCompareView() {
+        const rNode = nodeMap[rawSelect.value] || rawNodes[0];
+        const wNode = nodeMap[wikiSelect.value] || wikiNodes[0];
+        document.getElementById("rawCompareBody").textContent = rNode ? rNode.content : "";
+        document.getElementById("wikiCompareBody").textContent = wNode ? wNode.content : "";
+      }
+      rawSelect.addEventListener("change", updateCompareView);
+      wikiSelect.addEventListener("change", updateCompareView);
+      if (rawNodes[1]) rawSelect.value = rawNodes[1].id;
+      if (wikiNodes[0]) wikiSelect.value = wikiNodes[0].id;
+      updateCompareView();
+
+      // 4. Render Lint & Constitution Tab
+      const lintTab = document.getElementById("tab-lint");
+      let lintHtml = `
+        <div class="doc-header">
+          <div class="doc-badge-row">
+            <span class="badge wiki">DETERMINISTIC QA GATE</span>
+            <span class="badge meta">scripts/wiki_tool.py lint</span>
+          </div>
+          <div class="doc-title">6대 위키 무결성 감사 리포트 & 멀티 에이전트 헌법</div>
+          <div class="doc-summary">
+            특정 AI 모델(Claude Code 또는 Antigravity Gemini 4 Argon High)에 종속되지 않고, 로컬 마크다운 헌법(<code>AGENTS.md</code>, <code>GEMINI.md</code>, <code>CLAUDE.md</code>)과 결정론적 파이썬 린터(<code>wiki_tool.py</code>)로 검증한 결과입니다.
+          </div>
+        </div>
+      `;
+      data.lint.checks.forEach((chk) => {
+        lintHtml += `
+          <div class="lint-card">
+            <div class="left">
+              <h4>[${chk.id}] ${chk.name}</h4>
+              <p>규칙: ${chk.rule} — <strong>${chk.detail}</strong></p>
+            </div>
+            <span class="lint-pass">${chk.passed ? "PASS ✔" : "FAIL ✗"}</span>
+          </div>
+        `;
+      });
+      lintHtml += `
+        <div class="markdown-body" style="margin-top:16px;">
+          <h2>📜 AGENTS.md (공통 마크다운 헌법 전문)</h2>
+          <pre style="white-space:pre-wrap;font-size:12px;color:#c9d1d9;margin-top:8px;">${escapeHtml(data.constitutions["AGENTS.md"] || "")}</pre>
+        </div>
+      `;
+      lintTab.innerHTML = lintHtml;
+
+      // 5. Simple Markdown Formatter with clickable [[wiki-links]]
+      function escapeHtml(str) {
+        return String(str)
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;");
+      }
+
+      function renderMarkdown(mdText) {
+        // Strip YAML frontmatter
+        let body = mdText.replace(/^---\n[\s\S]*?\n---\n/, "");
+        let html = escapeHtml(body);
+
+        // Protect inline code spans first so `[[위키링크]]` inside backticks is rendered as code, not a dead link
+        const codeTokens = [];
+        html = html.replace(/`([^`\n]+)`/g, (m, codeContent) => {
+          const idx = codeTokens.length;
+          codeTokens.push(`<code>${codeContent}</code>`);
+          return `\x00CODE_${idx}\x00`;
+        });
+
+        // Convert [[wiki-link]] and [[wiki-link|alias]] to clickable spans
+        html = html.replace(/\[\[([^\]\|\n]+)(?:\|([^\]\n]+))?\]\]/g, (m, rawTarget, rawLabel) => {
+          const targetId = rawTarget.trim();
+          const labelText = rawLabel ? rawLabel.trim() : `[[${targetId}]]`;
+          if (nodeMap[targetId]) {
+            return `<a class="wikilink-inline" data-target="${targetId}">${labelText}</a>`;
+          }
+          return `<code>[[${rawTarget}${rawLabel ? "|" + rawLabel : ""}]]</code>`;
+        });
+
+        // Bold
+        html = html.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+
+        // Restore inline code spans
+        html = html.replace(/\x00CODE_(\d+)\x00/g, (m, idx) => codeTokens[Number(idx)]);
+
+        // Line-by-line block parsing
+        const lines = html.split("\n");
+        let out = [];
+        let inTable = false;
+        let inList = false;
+        lines.forEach((line) => {
+          const trimmed = line.trim();
+          if (trimmed.startsWith("|") && trimmed.endsWith("|")) {
+            if (inList) { out.push("</ul>"); inList = false; }
+            if (trimmed.replace(/[\|\-\s:]/g, "") === "") return;
+            const cells = trimmed.slice(1, -1).split("|").map((c) => c.trim());
+            if (!inTable) {
+              out.push("<table><thead><tr>" + cells.map((c) => `<th>${c}</th>`).join("") + "</tr></thead><tbody>");
+              inTable = true;
+            } else {
+              out.push("<tr>" + cells.map((c) => `<td>${c}</td>`).join("") + "</tr>");
+            }
+            return;
+          } else if (inTable) {
+            out.push("</tbody></table>");
+            inTable = false;
+          }
+
+          const isBullet = trimmed.startsWith("- ") || /^\d+[\.\)]\s+/.test(trimmed);
+          if (isBullet) {
+            if (!inList) { out.push("<ul>"); inList = true; }
+            const itemText = trimmed.startsWith("- ") ? trimmed.slice(2) : trimmed.replace(/^\d+[\.\)]\s+/, "");
+            out.push(`<li>${itemText}</li>`);
+            return;
+          } else if (inList) {
+            out.push("</ul>");
+            inList = false;
+          }
+
+          if (trimmed.startsWith("### ")) out.push(`<h3>${trimmed.slice(4)}</h3>`);
+          else if (trimmed.startsWith("## ")) out.push(`<h2>${trimmed.slice(3)}</h2>`);
+          else if (trimmed.startsWith("# ")) out.push(`<h1>${trimmed.slice(2)}</h1>`);
+          else if (trimmed.startsWith("&gt; ")) out.push(`<div class="doc-summary" style="margin:8px 0;">${trimmed.slice(5)}</div>`);
+          else if (trimmed === "---") out.push(`<hr style="border:none;border-top:1px solid var(--border);margin:12px 0;" />`);
+          else if (trimmed.length > 0) out.push(`<p>${trimmed}</p>`);
+        });
+        if (inList) out.push("</ul>");
+        if (inTable) out.push("</tbody></table>");
+        return out.join("\n");
+      }
+
+      // 6. Select Node and Render Inspector
+      let selectedNodeId = "llm-wiki-architecture";
+
+      function selectNode(nodeId) {
+        if (!nodeMap[nodeId]) return;
+        selectedNodeId = nodeId;
+        const n = nodeMap[nodeId];
+        document.getElementById("hoverStatus").textContent = `선택된 노드: ${n.id} (${n.title})`;
+
+        const reader = document.getElementById("tab-reader");
+        const outbound = n.outbound || [];
+        const inbound = n.inbound || [];
+        const sources = n.sources || [];
+
+        let linksHtml = "";
+        if (n.group === "wiki") {
+          linksHtml = `
+            <div class="link-grid">
+              <div class="link-box">
+                <h4>🔗 나가는 [[위키링크]] (${outbound.length})</h4>
+                <div class="pill-list">
+                  ${outbound.map((id) => `<span class="node-pill" data-target="${id}">[[${id}]]</span>`).join("")}
+                </div>
+              </div>
+              <div class="link-box">
+                <h4>↩️ 들어오는 백링크 (${inbound.length}) &amp; 원자료 (${sources.length})</h4>
+                <div class="pill-list">
+                  ${inbound.map((id) => `<span class="node-pill" data-target="${id}">← [[${id}]]</span>`).join("")}
+                  ${sources.map((s) => `<span class="node-pill raw-pill" data-target="${s}">📄 ${s.replace("raw/", "")}</span>`).join("")}
+                </div>
+              </div>
+            </div>
+          `;
+        } else if (n.group === "raw") {
+          const citedBy = data.nodes.filter((w) => (w.sources || []).includes(n.id));
+          linksHtml = `
+            <div class="link-grid">
+              <div class="link-box" style="grid-column: span 2;">
+                <h4>🧠 이 원자료를 인용해 컴파일된 위키 문서 (${citedBy.length}건)</h4>
+                <div class="pill-list">
+                  ${citedBy.map((w) => `<span class="node-pill" data-target="${w.id}">→ [[${w.id}]] (${w.title})</span>`).join("")}
+                </div>
+              </div>
+            </div>
+          `;
+        }
+
+        reader.innerHTML = `
+          <div class="doc-header">
+            <div class="doc-badge-row">
+              <span class="badge ${n.group}">${n.group.toUpperCase()}</span>
+              <span class="badge meta">${n.path || n.id}</span>
+              <span class="badge meta">${n.chars.toLocaleString()}자 (${n.lines}줄)</span>
+              ${n.verified_marks ? `<span class="badge wiki">1차 근거 ✔ ${n.verified_marks}회</span>` : ""}
+            </div>
+            <div class="doc-title">${escapeHtml(n.title)}</div>
+            <div class="doc-summary">${escapeHtml(n.summary || "")}</div>
+            ${linksHtml}
+          </div>
+          <div class="markdown-body">${renderMarkdown(n.content)}</div>
+        `;
+
+        // Sync Compare Dropdowns
+        if (n.group === "raw") {
+          rawSelect.value = n.id;
+          updateCompareView();
+        } else {
+          wikiSelect.value = n.id;
+          if (sources.length > 0 && nodeMap[sources[0]]) {
+            rawSelect.value = sources[0];
+          }
+          updateCompareView();
+        }
+
+        // Bind pill clicks
+        reader.querySelectorAll("[data-target]").forEach((el) => {
+          el.addEventListener("click", () => {
+            selectNode(el.getAttribute("data-target"));
+          });
+        });
+
+        drawGraph();
+      }
+
+      // 7. Interactive Canvas Graph Layout
+      const canvas = document.getElementById("graphCanvas");
+      const ctx = canvas.getContext("2d");
+      let width = 800, height = 600;
+      let searchQuery = "";
+
+      // Position nodes in clear radial/layered clusters so every node and label is legible
+      function layoutNodes() {
+        const cx = width * 0.54;
+        const cy = height * 0.49;
+        const rawList = data.nodes.filter((n) => n.group === "raw");
+        const wikiList = data.nodes.filter((n) => n.group === "wiki");
+        const metaList = data.nodes.filter((n) => n.group === "meta");
+
+        // Left column: raw sources
+        rawList.forEach((n, idx) => {
+          const span = Math.min(height * 0.72, 410);
+          const startY = cy - span / 2;
+          n.x = Math.max(78, width * 0.18);
+          n.y = startY + (span / Math.max(rawList.length - 1, 1)) * idx;
+          n.r = 15;
+        });
+
+        // Center/Right ring: compiled wiki concept nodes (rotated slightly so bottom labels never share the same Y)
+        const radiusX = Math.min(width * 0.25, 190);
+        const radiusY = Math.min(height * 0.35, 210);
+        wikiList.forEach((n, idx) => {
+          const angle = -Math.PI / 2 + 0.26 + (2 * Math.PI * idx) / wikiList.length;
+          n.x = cx + Math.cos(angle) * radiusX + 42;
+          n.y = cy + Math.sin(angle) * radiusY;
+          n.r = 20;
+        });
+
+        // Meta hub nodes at center
+        metaList.forEach((n, idx) => {
+          n.x = cx + 42;
+          n.y = cy + (idx === 0 ? -34 : 36);
+          n.r = 14;
+        });
+      }
+
+      function resizeCanvas() {
+        const rect = canvas.parentElement.getBoundingClientRect();
+        width = rect.width;
+        height = rect.height - 45;
+        const dpr = window.devicePixelRatio || 1;
+        canvas.width = width * dpr;
+        canvas.height = height * dpr;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        layoutNodes();
+        drawGraph();
+      }
+
+      function drawGraph() {
+        ctx.clearRect(0, 0, width, height);
+
+        // Subtle background grid
+        ctx.strokeStyle = "rgba(48, 54, 61, 0.35)";
+        ctx.lineWidth = 1;
+        for (let x = 0; x < width; x += 40) {
+          ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, height); ctx.stroke();
+        }
+        for (let y = 0; y < height; y += 40) {
+          ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(width, y); ctx.stroke();
+        }
+
+        // Draw Edges
+        data.edges.forEach((e) => {
+          const src = nodeMap[e.from];
+          const dst = nodeMap[e.to];
+          if (!src || !dst) return;
+          const isHighlighted = e.from === selectedNodeId || e.to === selectedNodeId;
+
+          ctx.beginPath();
+          ctx.moveTo(src.x, src.y);
+          ctx.lineTo(dst.x, dst.y);
+
+          if (e.type === "source") {
+            ctx.setLineDash([4, 4]);
+            ctx.strokeStyle = isHighlighted ? "rgba(245, 158, 11, 0.9)" : "rgba(245, 158, 11, 0.22)";
+            ctx.lineWidth = isHighlighted ? 2.2 : 1.1;
+          } else {
+            ctx.setLineDash([]);
+            ctx.strokeStyle = isHighlighted ? "rgba(56, 189, 248, 0.95)" : "rgba(56, 189, 248, 0.25)";
+            ctx.lineWidth = isHighlighted ? 2.5 : 1.2;
+          }
+          ctx.stroke();
+          ctx.setLineDash([]);
+        });
+
+        // Draw Nodes
+        data.nodes.forEach((n) => {
+          const isSelected = n.id === selectedNodeId;
+          const matchesSearch =
+            !searchQuery ||
+            n.id.toLowerCase().includes(searchQuery) ||
+            n.title.toLowerCase().includes(searchQuery);
+
+          const alpha = matchesSearch ? 1.0 : 0.25;
+          ctx.save();
+          ctx.globalAlpha = alpha;
+
+          let fill = "#38bdf8";
+          if (n.group === "raw") fill = "#f59e0b";
+          else if (n.group === "meta") fill = "#a78bfa";
+
+          if (isSelected) {
+            ctx.beginPath();
+            ctx.arc(n.x, n.y, n.r + 7, 0, Math.PI * 2);
+            ctx.fillStyle = n.group === "raw" ? "rgba(245, 158, 11, 0.25)" : "rgba(56, 189, 248, 0.28)";
+            ctx.fill();
+          }
+
+          ctx.beginPath();
+          ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+          ctx.fillStyle = fill;
+          ctx.fill();
+          ctx.lineWidth = isSelected ? 3 : 1.5;
+          ctx.strokeStyle = isSelected ? "#ffffff" : "#0d1117";
+          ctx.stroke();
+
+          // Node Label (clamped inside canvas bounds so edges never clip)
+          ctx.font = isSelected ? "700 11.5px -apple-system, Pretendard, sans-serif" : "600 10.5px -apple-system, Pretendard, sans-serif";
+          ctx.fillStyle = isSelected ? "#ffffff" : "#e6edf3";
+          ctx.textAlign = "center";
+          const shortLabel = n.group === "raw"
+            ? n.label.replace("2026-10-", "10-").replace(".md", "")
+            : n.id;
+          const tw = ctx.measureText(shortLabel).width;
+          const labelX = Math.max(tw / 2 + 6, Math.min(width - tw / 2 - 6, n.x));
+          ctx.fillText(shortLabel, labelX, n.y + n.r + 14);
+          ctx.restore();
+        });
+      }
+
+      // Dragging & Clicking on Canvas
+      let draggingNode = null;
+      canvas.addEventListener("mousedown", (ev) => {
+        const rect = canvas.getBoundingClientRect();
+        const mx = ev.clientX - rect.left;
+        const my = ev.clientY - rect.top;
+        for (const n of data.nodes) {
+          const dx = mx - n.x;
+          const dy = my - n.y;
+          if (dx * dx + dy * dy <= (n.r + 6) * (n.r + 6)) {
+            draggingNode = n;
+            selectNode(n.id);
+            break;
+          }
+        }
+      });
+      window.addEventListener("mousemove", (ev) => {
+        if (!draggingNode) return;
+        const rect = canvas.getBoundingClientRect();
+        draggingNode.x = ev.clientX - rect.left;
+        draggingNode.y = ev.clientY - rect.top;
+        drawGraph();
+      });
+      window.addEventListener("mouseup", () => { draggingNode = null; });
+
+      document.getElementById("searchInput").addEventListener("input", (ev) => {
+        searchQuery = ev.target.value.trim().toLowerCase();
+        drawGraph();
+      });
+
+      window.addEventListener("resize", resizeCanvas);
+      window.selectNode = selectNode;
+      window.renderMarkdown = renderMarkdown;
+      resizeCanvas();
+      selectNode("llm-wiki-architecture");
+    })();
+  </script>
+</body>
+</html>
