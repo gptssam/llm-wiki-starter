@@ -11,7 +11,8 @@ description: Andrej Karpathy의 LLM Wiki 3계층 아키텍처에 따라 raw/ 폴
 
 사용자가 저장소를 클론하거나 `"사용할 수 있게 셋팅해줘"`라고 요청하면 아래 4단계를 순서대로 자동 실행하세요:
 
-1. **상태 점검 및 빌드**:
+1. **다운로드(`git` 미설치 시 자동 우회) 및 빌드**:
+   - 만약 아직 클론 전이고 사용자 PC에 `git`이 없다면 `curl -sL https://github.com/gptssam/llm-wiki-starter/archive/refs/heads/main.tar.gz | tar -xz && mv llm-wiki-starter-main llm-wiki-starter`로 다운로드합니다.
    ```bash
    python3 scripts/wiki_tool.py status
    python3 scripts/wiki_tool.py build
@@ -27,7 +28,7 @@ description: Andrej Karpathy의 LLM Wiki 3계층 아키텍처에 따라 raw/ 폴
 4. **사용자 맞춤 온보딩 역질문 (3가지)**:
    셋업 완료 결과를 짧게 브리핑한 뒤, 사용자가 본인만의 위키를 바로 시작할 수 있도록 아래 3가지를 질문하세요:
    - ① 어떤 주제나 업무의 메모(`raw/`)를 정리하고 싶으신가요? (예: AI 영상 제작, 프로젝트 회의록, 논문/아티클 스크랩 등)
-   - ② 지금 바로 `raw/` 폴더에 넣어볼 메모 텍스트나 파일이 있으신가요? (채팅창에 바로 붙여넣어 주셔도 됩니다)
+   - ② 지금 바로 `raw/` 폴더에 넣어볼 메모 텍스트나 파일이 있으신가요? *(아직 준비된 메모 파일이 없다면 평소 관심 있는 키워드 한 단어만 말씀해 달라고 안내하세요. 에이전트가 즉석에서 맞춤 샘플 메모를 `raw/`에 생성해 위키 그래프에 연결해 줍니다!)*
    - ③ 기존 샘플 데이터(원자료 5건·위키 7건)를 유지한 채 추가할까요, 아니면 샘플을 백업하고 빈 위키로 새로 시작할까요?
 
 ## 2. 3대 핵심 워크플로우

@@ -106,7 +106,8 @@ tags:
 
 사용자가 `"이 깃허브 저장소를 클론하고 사용할 수 있게 셋팅해줘"`라고 요청하면, 에이전트(Claude Code · Codex · Antigravity)는 아래 절차를 자동 수행합니다:
 
-1. `python3 scripts/wiki_tool.py status && python3 scripts/wiki_tool.py build && python3 scripts/wiki_tool.py lint`를 실행해 `6/6 PASS`를 확인합니다.
-2. OS에 맞는 명령어(`open viewer/index.html` / `start viewer/index.html` / `xdg-open viewer/index.html`)로 로컬 지식 그래프 뷰어를 브라우저에 띄웁니다.
-3. 사용자에게 ① 정리하고 싶은 메모 주제, ② 지금 바로 `raw/`에 투입할 메모 유무, ③ 샘플 데이터 유지 여부를 질문하여 즉시 맞춤형 위키 구축을 시작합니다.
+1. 저장소를 클론합니다. 만약 사용자 PC에 `git`이 설치되어 있지 않다면 `curl -sL https://github.com/gptssam/llm-wiki-starter/archive/refs/heads/main.tar.gz | tar -xz && mv llm-wiki-starter-main llm-wiki-starter`로 자동 우회하여 다운로드합니다.
+2. `python3 scripts/wiki_tool.py status && python3 scripts/wiki_tool.py build && python3 scripts/wiki_tool.py lint`를 실행해 `6/6 PASS`를 확인합니다.
+3. OS에 맞는 명령어(`open viewer/index.html` / `start viewer/index.html` / `xdg-open viewer/index.html`)로 로컬 지식 그래프 뷰어를 브라우저에 띄웁니다.
+4. 사용자에게 ① 정리하고 싶은 메모 주제, ② 지금 바로 `raw/`에 투입할 메모 유무(준비된 메모가 없다면 관심 키워드 한 단어만 받아 에이전트가 즉석에서 샘플 메모를 `raw/`에 생성·컴파일해 줌), ③ 기존 샘플 데이터 유지 여부를 질문하여 즉시 맞춤형 위키 구축을 시작합니다.
 

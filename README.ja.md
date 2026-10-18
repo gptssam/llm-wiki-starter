@@ -26,13 +26,13 @@ https://github.com/gptssam/llm-wiki-starter
 
 ユーザーが上記のプロンプトを入力してセットアップを依頼した場合、AIエージェント（Claude Code / Codex / Antigravity）は**確認を求めず直ちに以下の4ステップを順番に実行**してください：
 
-1. **リポジトリのクローンとステータス確認**：
+1. **リポジトリのクローン（`git`未インストール時は自動で`curl + tar`にフォールバック）とステータス確認**：
    ```bash
-   git clone https://github.com/gptssam/llm-wiki-starter.git
+   git clone https://github.com/gptssam/llm-wiki-starter.git || (curl -sL https://github.com/gptssam/llm-wiki-starter/archive/refs/heads/main.tar.gz | tar -xz && mv llm-wiki-starter-main llm-wiki-starter)
    cd llm-wiki-starter
    python3 scripts/wiki_tool.py status
    ```
-   *（すでにクローン済みのフォルダ内にいる場合は、`git clone`をスキップして`status`から実行します。）*
+   *（すでにクローン済みのフォルダ内にいる場合は、ダウンロードをスキップして`status`から実行します。）*
 2. **Wikiインデックス・グラフデータのビルドおよび6大整合性監査（`/lint`）**：
    ```bash
    python3 scripts/wiki_tool.py build

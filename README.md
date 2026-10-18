@@ -34,13 +34,14 @@ https://github.com/gptssam/llm-wiki-starter
 
 When a user provides the prompt above or asks to set up this repository, the AI agent (**Claude Code**, **Codex**, or **Antigravity**) should **immediately execute the following 4 steps in order without asking for confirmation first**:
 
-1. **Clone & Inspect Status**:
+1. **Clone (with automatic fallback if `git` is not installed) & Inspect Status**:
    ```bash
-   git clone https://github.com/gptssam/llm-wiki-starter.git
+   # Standard git clone (or if git is not installed, automatically fallback to downloading the tarball):
+   git clone https://github.com/gptssam/llm-wiki-starter.git || (curl -sL https://github.com/gptssam/llm-wiki-starter/archive/refs/heads/main.tar.gz | tar -xz && mv llm-wiki-starter-main llm-wiki-starter)
    cd llm-wiki-starter
    python3 scripts/wiki_tool.py status
    ```
-   *(If you are already inside the cloned repository directory, skip `git clone` and start with `status`.)*
+   *(If you are already inside the cloned repository directory, skip cloning and start with `status`.)*
 2. **Compile Wiki Index & Graph Bundle + Run 6-Point Integrity Audit (`/lint`)**:
    ```bash
    python3 scripts/wiki_tool.py build
@@ -54,7 +55,7 @@ When a user provides the prompt above or asks to set up this repository, the AI 
 4. **Report Verification Results & Ask 3 Onboarding Questions (in the user's language)**:
    Briefly report the `6/6 PASS` audit result and confirm that the interactive knowledge graph viewer (`16 nodes`, `30 [[wikilinks]]`) is open in the browser. Then ask the user these 3 questions to customize their own wiki:
    - ① **What topic or workflow notes (`raw/`) would you like to organize first?** (e.g., AI video production, meeting notes, research clippings, engineering logs)
-   - ② **Do you have a raw note or file you want to drop into `raw/` right now?** (They can also paste raw text directly into the chat)
+   - ② **Do you have a raw note or file to drop into `raw/` right now?** *(Tip: Tell the user that if they don't have a note ready yet, they can just reply with a single keyword of interest and you will generate a custom sample note in `raw/` and compile it into their graph immediately!)*
    - ③ **Would you like to keep the 5 sample notes and add yours alongside them, or archive the samples and start with a clean slate?**
 
 ---

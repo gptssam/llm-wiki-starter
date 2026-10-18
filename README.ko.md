@@ -26,13 +26,14 @@ https://github.com/gptssam/llm-wiki-starter
 
 사용자가 위 프롬프트를 입력해 이 저장소를 열었거나 셋업을 요청했다면, 에이전트(Claude Code / Codex / Antigravity)는 **질문 없이 즉시 아래 4단계를 순서대로 실행**하세요:
 
-1. **저장소 클론 및 상태 확인**:
+1. **저장소 클론 (`git` 미설치 PC 자동 우회 포함) 및 상태 확인**:
    ```bash
-   git clone https://github.com/gptssam/llm-wiki-starter.git
+   # git이 있으면 git clone, 만약 git이 설치되어 있지 않다면 curl + tar로 자동 우회 다운로드:
+   git clone https://github.com/gptssam/llm-wiki-starter.git || (curl -sL https://github.com/gptssam/llm-wiki-starter/archive/refs/heads/main.tar.gz | tar -xz && mv llm-wiki-starter-main llm-wiki-starter)
    cd llm-wiki-starter
    python3 scripts/wiki_tool.py status
    ```
-   *(이미 클론된 폴더 내부라면 `git clone`은 건너뛰고 `status`부터 실행합니다.)*
+   *(이미 클론된 폴더 내부라면 다운로드 단계는 건너뛰고 `status`부터 실행합니다.)*
 2. **위키 인덱스·그래프 번들 컴파일 및 6대 무결성 감사 (`/lint`)**:
    ```bash
    python3 scripts/wiki_tool.py build
@@ -46,7 +47,7 @@ https://github.com/gptssam/llm-wiki-starter
 4. **셋업 완료 보고 및 사용자 맞춤 온보딩 질문 (3가지)**:
    `6/6 PASS` 검증 결과와 함께 브라우저에 열린 지식 그래프 뷰어(원자료 5건 · 위키 9건 · `[[위키링크]]` 30개)를 안내한 뒤, 사용자가 본인만의 위키를 바로 만들 수 있도록 아래 3가지를 질문하세요:
    - ① **어떤 주제나 업무의 메모(`raw/`)를 정리하고 싶으신가요?** (예: AI 영상 제작, 업무 회의록, 리서치 스크랩, 코딩 노트 등)
-   - ② **지금 바로 `raw/` 폴더에 넣어볼 메모 텍스트나 파일이 있으신가요?** (채팅창에 바로 붙여넣어 주셔도 됩니다)
+   - ② **지금 바로 `raw/` 폴더에 넣어볼 메모 텍스트나 파일이 있으신가요?** *(안내 팁: 아직 준비된 메모 파일이 없다면 평소 관심 있는 주제 키워드 한 단어만 말씀해 달라고 안내하세요. 에이전트가 즉석에서 맞춤 샘플 메모를 `raw/`에 생성해 위키 그래프에 연결해 줄 수 있습니다!)*
    - ③ **기존 샘플 데이터(원자료 5건·위키 7건)를 유지한 채 추가할까요, 아니면 샘플을 백업하고 빈 위키로 새로 시작할까요?**
 
 ---

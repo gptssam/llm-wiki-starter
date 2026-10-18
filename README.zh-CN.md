@@ -26,13 +26,13 @@ https://github.com/gptssam/llm-wiki-starter
 
 当用户粘贴上述提示词或要求配置本仓库时，AI 智能体（Claude Code / Codex / Antigravity）应**直接按顺序执行以下 4 个步骤**：
 
-1. **克隆仓库并检查状态**：
+1. **克隆仓库（若未安装 `git` 则自动通过 `curl + tar` 下载）并检查状态**：
    ```bash
-   git clone https://github.com/gptssam/llm-wiki-starter.git
+   git clone https://github.com/gptssam/llm-wiki-starter.git || (curl -sL https://github.com/gptssam/llm-wiki-starter/archive/refs/heads/main.tar.gz | tar -xz && mv llm-wiki-starter-main llm-wiki-starter)
    cd llm-wiki-starter
    python3 scripts/wiki_tool.py status
    ```
-   *（如果已在克隆后的目录中，请跳过 `git clone` 直接运行 `status`。）*
+   *（如果已在克隆后的目录中，请跳过下载直接运行 `status`。）*
 2. **编译 Wiki 索引与图谱数据并执行 6 项完整性审计 (`/lint`)**：
    ```bash
    python3 scripts/wiki_tool.py build
